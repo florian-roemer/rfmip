@@ -107,9 +107,9 @@ def olr_setup():
     exp = ExperimentSetup(
         name='olr',
         description='goal is to reproduce a olr plot',
-        rfmip_path='/Users/jpetersen/rare/rfmip/',
+        rfmip_path='/Users/froemer/Documents/wv_continuum/rfmip/',
         input_folder='input/olr/',
-        arts_data_path='/Users/jpetersen/rare/',
+        arts_data_path='/Users/froemer/Documents/',
         lookuptable='olr.xml',
         solar_type='None',
         planck_emission='1',
