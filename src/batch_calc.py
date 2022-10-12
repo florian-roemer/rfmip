@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from experiment_setup import read_exp_setup
 from batch_lookuptable import BatchLookUpTable
 
-def run_arts_batch(exp_setup, verbosity=3):
+def run_arts_batch(exp_setup, verbosity=3, continua=True):
     """Run Arts Calculation for RFMIP. """
 
     ws = pyarts.workspace.Workspace(verbosity=verbosity)
@@ -62,7 +62,7 @@ def run_arts_batch(exp_setup, verbosity=3):
     ws.batch_atm_fields_compact = pyarts.xml.load(f'{exp_setup.rfmip_path}{exp_setup.input_folder}atm_fields.xml')
 
     species = pyarts.xml.load(f"{exp_setup.rfmip_path}{exp_setup.input_folder}species.xml")
-    add_species(ws, species)
+    add_species(ws, species, continua=continua)
 
     ## Lookup Table
     lut = BatchLookUpTable(exp_setup=exp_setup, ws=ws)
@@ -119,7 +119,7 @@ def run_arts_batch(exp_setup, verbosity=3):
         os.mkdir(f'{exp_setup.rfmip_path}output/{exp_setup.name}/')
     
     print('saving')
-    ws.WriteXML('binary', ws.dobatch_spectral_irradiance_field, f'{exp_setup.rfmip_path}output/{exp_setup.name}/spectral_irradiance.xml')
+    ws.WriteXML('binary', ws.dobatch_spectral_irradiance_field, f'{exp_setup.rfmip_path}output/{exp_setup.name}/continua_{continua}/spectral_irradiance.xml')
 
 
 @pyarts.workspace.arts_agenda(allow_callbacks=False)
@@ -254,33 +254,30 @@ def gas_scattering_agenda__Rayleigh(ws):
     ws.gas_scattering_matRayleigh()
 
 
-def add_species(ws, species):
-    # NO NH3!!
-    # replace CO2 with CO2 LineMixing
-    if 'abs_species-H2O' in species:
-        replace_values(species, 'abs_species-H2O', ['abs_species-H2O', 'abs_species-H2O-SelfContCKDMT252', 'abs_species-H2OForeignContCKDMT252'])
+def add_species(ws, species, continua=True):
+    # if "abs_species-O3" in species:
+    #     species.append("abs_species-O3-XFIT")
+    if ('abs_species-H2O' in species) and continua:
+        species.append('abs_species-H2O-SelfContCKDMT252')
+        species.append('abs_species-H2O-ForeignContCKDMT252')
     if 'abs_species-CO2' in species:
-        replace_values(species, 'abs_species-CO2', ['abs_species-CO2', 'abs_species-CO2-LM', 'abs_species-CO2-CKDMT252'])
-    if 'abs_species-O3' in species:
-        replace_values(species, 'abs_species-O3', ['abs_species-O3', 'abs_species-O3-XFIT'])
+        # species.append('abs_species-CO2-LM')
+        species.append('abs_species-CO2-CKDMT252')
     if 'abs_species-O2' in species:
-        replace_values(species, 'abs_species-O2', ['abs_species-O2', 'abs_species-O2-CIAfunCKDMT100'])   
+        species.append('abs_species-O2-CIAfunCKDMT100')
     if 'abs_species-N2' in species:
-        replace_values(species, 'abs_species-N2', ['abs_species-N2', 'abs_species-N2-CIAfunCKDMT252', 'abs_species-N2-CIAfunCKDMT252'])
+        species.append('abs_species-N2-CIAfunCKDMT252')
+        species.append('abs_species-N2-CIAfunCKDMT252')
 
     species = [spec[12:] for spec in species]
     
     ws.abs_speciesSet(species=species)
 
 
-def replace_values(list_to_replace, item_to_replace, item_to_replace_with):
-    return [item_to_replace_with if item == item_to_replace else item for item in list_to_replace]
-
-
 def main():
     exp = read_exp_setup(exp_name='test', path='/Users/jpetersen/rare/rfmip/experiment_setups/')
     print(exp)
-    run_arts_batch(exp)
+    run_arts_batch(exp, continua=True)
 
 
 if __name__ == '__main__':

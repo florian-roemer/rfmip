@@ -8,6 +8,11 @@ import typhon as ty
 import write_xml_input_data as input_data
 from experiment_setup import ExperimentSetup, read_exp_setup
 
+
+def calc_lookup(exp_setup, recalculate=False, continua=True):
+    lut = BatchLookUpTable(exp_setup)
+    lut.calculate(recalculate=recalculate, optimise_speed=True, continua=continua)
+
 class BatchLookUpTable():
     def __init__(self, exp_setup, ws=None, n_chunks: int = 0):
         self.exp_setup = exp_setup
@@ -24,26 +29,27 @@ class BatchLookUpTable():
             raise ValueError(f'`n_chunks` must be between 2 and 99 (or 0 / 1 for no splitting) but is {n_chunks}!')
 
 
-    def calculate(self, load_if_exist=False, recalculate=False, optimise_speed=False, chunk_id=None):
+    def calculate(self, load_if_exist=False, recalculate=False, optimise_speed=False, chunk_id=None,
+                  continua=True):
         self.chunk_id=chunk_id
-        if self.check_existing_lut():
+        if self.check_existing_lut(continua=continua):
             if not recalculate:
                 print("The Lookup Table is already calculated.")
                 if load_if_exist:
-                    self.load(optimise_speed=optimise_speed)
+                    self.load(optimise_speed=optimise_speed, continua=continua)
                 return
             print('The Lookuptable will be recalculated.')
 
         if self.new_ws:
             print('Necessary quantities are loaded.')
-            self.lut_setup()
+            self.lut_setup(continua)
         print('The Lookup Table calculation is starting.')
         with ty.utils.Timer():
-            self.calculate_lut(optimise_speed=optimise_speed)
+            self.calculate_lut(optimise_speed=optimise_speed, continua=continua)
         print('Finished with Lookup Table calculation.')
 
 
-    def lut_setup(self):
+    def lut_setup(self, continua):
         self.ws.LegacyContinuaInit()
         self.ws.PlanetSet(option="Earth")        
 
@@ -52,10 +58,10 @@ class BatchLookUpTable():
         self.ws.AtmosphereSet1D()
         self.ws.batch_atm_fields_compact = pyarts.xml.load(f'{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}atm_fields.xml')
         species = pyarts.xml.load(f"{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}species.xml")
-        self.add_species(species)
+        self.add_species(species=species, continua=continua)
 
 
-    def calculate_lut(self, optimise_speed=False):
+    def calculate_lut(self, optimise_speed=False, continua=True):
         # Read a line file and a matching small frequency grid
         self.ws.abs_lines_per_speciesReadSpeciesSplitCatalog(
         basename=f'{self.exp_setup.arts_data_path}arts-cat-data/lines/'
@@ -80,12 +86,12 @@ class BatchLookUpTable():
         savename = (
             f'{self.exp_setup.rfmip_path}lookup_tables/{self.exp_setup.lookuptable}'
             if self.n_chunks is None
-            else f'{self.exp_setup.rfmip_path}lookup_tables/chunk{str(self.chunk_id).zfill(2)}_{self.exp_setup.lookuptable}'
+            else f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/chunk{str(self.chunk_id).zfill(2)}_{self.exp_setup.lookuptable}'
         )
         pyarts.xml.save(self.ws.abs_lookup.value, savename)
 
 
-    def load(self, optimise_speed=False):
+    def load(self, optimise_speed=False, continua=True):
         """ Loads existing Lookup table and adjust it for the calculation. """
         self.ws.Touch(self.ws.abs_lines_per_species)
         if optimise_speed:
@@ -94,7 +100,7 @@ class BatchLookUpTable():
 
         self.ws.propmat_clearsky_agendaAuto()
 
-        self.ws.ReadXML(self.ws.abs_lookup, f'{self.exp_setup.rfmip_path}lookup_tables/{self.exp_setup.lookuptable}')
+        self.ws.ReadXML(self.ws.abs_lookup, f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}')
 
         self.ws.propmat_clearsky_agendaAuto(use_abs_lookup=1)
 
@@ -119,26 +125,28 @@ class BatchLookUpTable():
         self.ws.f_grid = f_grid
 
 
-    def add_species(self, species):
-        # adding Line MIxing and Self Continuum for some species
-        if "abs_species-O3" in species:
-            species.append("abs_species-O3-XFIT")
-        if 'abs_species-H2O' in species:
-            replace_values(species, 'abs_species-H2O', ['abs_species-H2O', 'abs_species-H2O-SelfContCKDMT252', 'abs_species-H2OForeignContCKDMT252'])
+    def add_species(self, species, continua=True):
+        # if "abs_species-O3" in species:
+        #     species.append("abs_species-O3-XFIT")
+        if ('abs_species-H2O' in species) and continua:
+            species.append('abs_species-H2O-SelfContCKDMT252')
+            species.append('abs_species-H2O-ForeignContCKDMT252')
         if 'abs_species-CO2' in species:
-            replace_values(species, 'abs_species-CO2', ['abs_species-CO2', 'abs_species-CO2-LM', 'abs_species-CO2-CKDMT252'])
+            # species.append('abs_species-CO2-LM')
+            species.append('abs_species-CO2-CKDMT252')
         if 'abs_species-O2' in species:
-            replace_values(species, 'abs_species-O2', ['abs_species-O2', 'abs_species-O2-CIAfunCKDMT100'])
+            species.append('abs_species-O2-CIAfunCKDMT100')
         if 'abs_species-N2' in species:
-            replace_values(species, 'abs_species-N2', ['abs_species-N2', 'abs_species-N2-CIAfunCKDMT252', 'abs_species-N2-CIAfunCKDMT252'])
+            species.append('abs_species-N2-CIAfunCKDMT252')
+            species.append('abs_species-N2-CIAfunCKDMT252')
 
         species = [spec[12:] for spec in species]
-
+        
         self.ws.abs_speciesSet(species=species)
 
 
-    def check_existing_lut(self):
-        return os.path.exists(f'{self.exp_setup.rfmip_path}lookup_tables/{self.exp_setup.lookuptable}')
+    def check_existing_lut(self, continua=True):
+        return os.path.exists(f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}')
 
 
 def replace_values(list_to_replace, item_to_replace, item_to_replace_with):
@@ -199,7 +207,7 @@ def main(exp=None, n_chunks=0, chunks_id=None):
     
     with ty.utils.Timer():
         lut = BatchLookUpTable(exp, n_chunks=n_chunks)
-        lut.calculate(recalculate=True, chunk_id=chunks_id, optimise_speed=True)
+        lut.calculate(recalculate=True, chunk_id=chunks_id, optimise_speed=True, continua=True)
     
 
 if __name__ == '__main__':
