@@ -4,10 +4,10 @@ import numpy as np
 from experiment_setup import read_exp_setup
 
 
-def read_spectral_irradiance(exp_setup) -> np.ndarray:
+def read_spectral_irradiance(exp_setup, continua=True) -> np.ndarray:
     data = np.squeeze(
         pyarts.xml.load(
-            f"{exp_setup.rfmip_path}output/{exp_setup.name}/spectral_irradiance.xml"
+            f"{exp_setup.rfmip_path}output/{exp_setup.name}/continua_{continua}/spectral_irradiance.xml"
         )
     )  # site, wavelength, pressure, down-/upward
     return data
@@ -28,8 +28,8 @@ def combine_sites(data, exp_setup) -> np.ndarray:
     return data
 
 
-def save_data(data, exp_setup, name) -> None:
-    pyarts.xml.save(data, f"{exp_setup.rfmip_path}output/{exp_setup.name}/{name}.xml")
+def save_data(data, exp_setup, name, continua=True) -> None:
+    pyarts.xml.save(data, f"{exp_setup.rfmip_path}output/{exp_setup.name}/continua_{continua}/{name}.xml")
 
 
 def main() -> None:
