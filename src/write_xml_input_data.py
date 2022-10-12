@@ -24,7 +24,7 @@ def create_input_data(exp_setup) -> None:
     write_xml(sensor_pos, "sensor_pos.xml", exp_setup)
     write_xml(data.solar_zenith_angle.values, "solar_zenith_angle.xml", exp_setup)
     write_xml(data.total_solar_irradiance.values, "total_solar_irradiance.xml", exp_setup)
-    scaled_solar_spectrum(exp_setup=exp_setup)
+    # scaled_solar_spectrum(exp_setup=exp_setup)
     write_xml(data.surface_albedo.values, "surface_albedo.xml", exp_setup)
     write_xml(data.profile_weight.values, "profil_weight.xml", exp_setup)
     write_xml(data.surface_temperature.values, "surface_temperature.xml", exp_setup)
