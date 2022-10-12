@@ -1,3 +1,4 @@
+# %%
 import os
 import pyarts
 import numpy as np
@@ -87,9 +88,9 @@ def plot_spectral_irradiance_profiles(exp_setup) -> None:
         )
 
     
-def plot_olr(exp_setup) -> None:
+def plot_olr(exp_setup, continua=True) -> None:
     data = np.array(pyarts.xml.load(
-        f"{exp_setup.rfmip_path}output/{exp_setup.name}/spectral_irradiance.xml"
+        f"{exp_setup.rfmip_path}output/{exp_setup.name}/continua_{continua}/spectral_irradiance.xml"
     ))  # site, wavelength, pressure, 1, 1, down-/upward
     
     spectral_grid = np.linspace(
@@ -112,12 +113,15 @@ def plot_olr(exp_setup) -> None:
         irradiance_converted[:-1],
     )
 
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
     ax.set_ylabel(r"spectral irradiance / W$\,$m$^{-2}\,$cm")
     ax.set_xlabel("wavenumber / cm-1")
     if not os.path.exists(f"{exp_setup.rfmip_path}plots/{exp_setup.name}/"):
-        os.mkdir(f"{exp_setup.rfmip_path}plots/{exp_setup.name}/")
+        os.mkdir(f"{exp_setup.rfmip_path}plots/{exp_setup.name}/continua_{continua}/")
     fig.savefig(
-        f"{exp_setup.rfmip_path}plots/{exp_setup.name}/olr_spectrum.png", dpi=200
+        f"{exp_setup.rfmip_path}plots/{exp_setup.name}/continua_{continua}/olr_spectrum.png", dpi=200
     )
 
 
@@ -189,14 +193,16 @@ def plot_irradiance(exp_setup):
 
 
 def main():
-    ty.plots.styles.use(["typhon", "typhon-dark"])
-    exp_setup = read_exp_setup(exp_name='testing_rfmip', path='/Users/jpetersen/rare/rfmip/experiment_setups/')
+    ty.plots.styles.use(["typhon"])
+    exp_setup = read_exp_setup(exp_name='olr', path='/Users/froemer/Documents/wv_continuum/rfmip/experiment_setups/')
     # plot_spectral_irradiance_profiles(exp_setup=exp_setup)
-    # plot_olr(exp_setup=exp_setup)
+    plot_olr(exp_setup=exp_setup)
     # plot_level_spectra(exp_setup=exp_setup)
-    plot_irradiance(exp_setup=exp_setup)
+    # plot_irradiance(exp_setup=exp_setup)
     plt.show()
 
 
 if __name__ == "__main__":
     main()
+
+# %%
