@@ -61,12 +61,26 @@ def run_arts_batch(exp_setup, verbosity=3, continua=True):
     ws.p_grids = pyarts.xml.load(f'{exp_setup.rfmip_path}{exp_setup.input_folder}pressure_layer.xml')
     ws.batch_atm_fields_compact = pyarts.xml.load(f'{exp_setup.rfmip_path}{exp_setup.input_folder}atm_fields.xml')
 
-    species = pyarts.xml.load(f"{exp_setup.rfmip_path}{exp_setup.input_folder}species.xml")
-    add_species(ws, species, continua=continua)
+    # species = pyarts.xml.load(f"{exp_setup.rfmip_path}{exp_setup.input_folder}species.xml")
+    # add_species(ws, species, continua=continua)
+    if continua == True:
+        species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320",
+                    "O3", "CO2, CO2-CKDMT252", "N2O"]
+    elif continua == "self":
+        species = ["H2O, H2O-SelfContCKDMT320",
+                    "O3", "CO2, CO2-CKDMT252", "N2O"]
+    elif continua == "foreign":
+        species = ["H2O, H2O-ForeignContCKDMT320",
+                    "O3", "CO2, CO2-CKDMT252", "N2O"]
+    elif continua == False:
+        species = ["H2O",
+                    "O3", "CO2, CO2-CKDMT252", "N2O"]
+    ws.abs_speciesSet(species=species)
+
 
     ## Lookup Table
     lut = BatchLookUpTable(exp_setup=exp_setup, ws=ws)
-    lut.calculate(load_if_exist=True, optimise_speed=True)
+    lut.calculate(load_if_exist=True, optimise_speed=True, continua=continua)
 
     ## Surface
     # set surface resolution
@@ -257,9 +271,15 @@ def gas_scattering_agenda__Rayleigh(ws):
 def add_species(ws, species, continua=True):
     # if "abs_species-O3" in species:
     #     species.append("abs_species-O3-XFIT")
-    if ('abs_species-H2O' in species) and continua:
-        species.append('abs_species-H2O-SelfContCKDMT252')
-        species.append('abs_species-H2O-ForeignContCKDMT252')
+    if ('abs_species-H2O' in species):
+        if continua == True:
+            species.append('abs_species-H2O-SelfContCKDMT252')
+            species.append('abs_species-H2O-ForeignContCKDMT252')
+        elif continua == 'self':
+            species.append('abs_species-H2O-SelfContCKDMT252')
+        elif continua == 'foreign':
+            species.append('abs_species-H2O-ForeignContCKDMT252')
+
     if 'abs_species-CO2' in species:
         # species.append('abs_species-CO2-LM')
         species.append('abs_species-CO2-CKDMT252')

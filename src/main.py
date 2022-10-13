@@ -63,5 +63,4 @@ def postprocessing(exp_setup, continua=True):
 
 
 if __name__ == '__main__':
-    main(continua=True)
-#%%
+    main(continua=False)

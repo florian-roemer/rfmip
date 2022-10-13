@@ -9,9 +9,9 @@ import write_xml_input_data as input_data
 from experiment_setup import ExperimentSetup, read_exp_setup
 
 
-def calc_lookup(exp_setup, recalculate=False, continua=True):
-    lut = BatchLookUpTable(exp_setup)
-    lut.calculate(recalculate=recalculate, optimise_speed=True, continua=continua)
+# def calc_lookup(exp_setup, recalculate=False, continua=True):
+#     lut = BatchLookUpTable(exp_setup)
+#     lut.calculate(recalculate=recalculate, optimise_speed=True, continua=continua)
 
 class BatchLookUpTable():
     def __init__(self, exp_setup, ws=None, n_chunks: int = 0):
@@ -57,8 +57,23 @@ class BatchLookUpTable():
         self.ws.stokes_dim = 1
         self.ws.AtmosphereSet1D()
         self.ws.batch_atm_fields_compact = pyarts.xml.load(f'{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}atm_fields.xml')
-        species = pyarts.xml.load(f"{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}species.xml")
-        self.add_species(species=species, continua=continua)
+        # species = pyarts.xml.load(f"{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}species.xml")
+        # self.add_species(species=species, continua=continua)
+        if continua == True:
+            species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320",
+                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+        elif continua == "self":
+            species = ["H2O, H2O-SelfContCKDMT320",
+                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+        elif continua == "foreign":
+            species = ["H2O, H2O-ForeignContCKDMT320",
+                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+        elif continua == False:
+            species = ["H2O",
+                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+
+        self.ws.abs_speciesSet(species=species)
+
 
 
     def calculate_lut(self, optimise_speed=False, continua=True):
@@ -84,12 +99,12 @@ class BatchLookUpTable():
         self.ws.propmat_clearsky_agendaAuto(use_abs_lookup=1)
         
         savename = (
-            f'{self.exp_setup.rfmip_path}lookup_tables/{self.exp_setup.lookuptable}'
+            f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}'
             if self.n_chunks is None
             else f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/chunk{str(self.chunk_id).zfill(2)}_{self.exp_setup.lookuptable}'
         )
-        pyarts.xml.save(self.ws.abs_lookup.value, savename)
-
+        # pyarts.xml.save(self.ws.abs_lookup.value, savename)
+        self.ws.abs_lookup.value.savexml(file=savename, type='binary')
 
     def load(self, optimise_speed=False, continua=True):
         """ Loads existing Lookup table and adjust it for the calculation. """
@@ -100,6 +115,7 @@ class BatchLookUpTable():
 
         self.ws.propmat_clearsky_agendaAuto()
 
+        print(f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}')
         self.ws.ReadXML(self.ws.abs_lookup, f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}')
 
         self.ws.propmat_clearsky_agendaAuto(use_abs_lookup=1)
@@ -125,29 +141,8 @@ class BatchLookUpTable():
         self.ws.f_grid = f_grid
 
 
-    def add_species(self, species, continua=True):
-        # if "abs_species-O3" in species:
-        #     species.append("abs_species-O3-XFIT")
-        if ('abs_species-H2O' in species) and continua:
-            species.append('abs_species-H2O-SelfContCKDMT252')
-            species.append('abs_species-H2O-ForeignContCKDMT252')
-        if 'abs_species-CO2' in species:
-            # species.append('abs_species-CO2-LM')
-            species.append('abs_species-CO2-CKDMT252')
-        if 'abs_species-O2' in species:
-            species.append('abs_species-O2-CIAfunCKDMT100')
-        if 'abs_species-N2' in species:
-            species.append('abs_species-N2-CIAfunCKDMT252')
-            species.append('abs_species-N2-CIAfunCKDMT252')
-
-        species = [spec[12:] for spec in species]
-        
-        self.ws.abs_speciesSet(species=species)
-
-
     def check_existing_lut(self, continua=True):
         return os.path.exists(f'{self.exp_setup.rfmip_path}lookup_tables/continua_{continua}/{self.exp_setup.lookuptable}')
-
 
 def replace_values(list_to_replace, item_to_replace, item_to_replace_with):
     return [item_to_replace_with if item == item_to_replace else item for item in list_to_replace]
@@ -188,7 +183,7 @@ def combine_luts(exp_setup, n_chunks=8):
     pyarts.xml.save(main_lut, f'{exp_setup.rfmip_path}lookup_tables/combined_{exp_setup.lookuptable}')
 
 
-def main(exp=None, n_chunks=0, chunks_id=None):
+def main(exp=None, n_chunks=0, chunks_id=None, continua=True):
     if exp is None:
         exp = ExperimentSetup(
             name='lut',
@@ -207,7 +202,7 @@ def main(exp=None, n_chunks=0, chunks_id=None):
     
     with ty.utils.Timer():
         lut = BatchLookUpTable(exp, n_chunks=n_chunks)
-        lut.calculate(recalculate=True, chunk_id=chunks_id, optimise_speed=True, continua=True)
+        lut.calculate(recalculate=True, chunk_id=chunks_id, optimise_speed=True, continua=continua)
     
 
 if __name__ == '__main__':
@@ -235,4 +230,5 @@ if __name__ == '__main__':
             exp = read_exp_setup(exp_name=str(exp_name), path=exp_setup_path)
             if not os.path.exists(f'{exp_name.rfmip_path}{exp_name.input_folder}'):
                 input_data.create_input_data(exp)
-        main(exp=exp, n_chunks=config['chunks'][0], chunks_id=config['chunks'][1])
+        main(exp=exp, n_chunks=config['chunks'][0], chunks_id=config['chunks'][1],
+             continua='self')
