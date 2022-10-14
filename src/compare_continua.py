@@ -43,8 +43,14 @@ def spectral_plot(ax):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    ax.set_ylabel(r"spectral irradiance / mW$\,$m$^{-2}\,$cm")
-    ax.set_xlabel("wavenumber / cm-1")
+    ax.set_ylabel(r"spectral irradiance / mW$\,$m$^{-2}\,$cm", fontsize=14)
+    ax.set_xlabel("wavenumber / cm-1", fontsize=14)
+    
+    ax.set_xticks(np.array(ax.get_xticks(), dtype='int'))
+    ax.set_yticks(np.array(ax.get_yticks(), dtype='int'))
+   
+    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=12)
+    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=12)
     
     return ax
 
@@ -58,14 +64,41 @@ def iwv_plot(ax):
 
     ax.set_ylabel(r"Flux / W$\,$m$^{-2}$", fontsize=14)
     ax.set_xlabel(r"WVC / kg$\,$m$^{-2}$", fontsize=14)
+
+    ax.set_xticks(np.array(ax.get_xticks(), dtype='int'))
+    ax.set_yticks(np.array(ax.get_yticks(), dtype='int'))
+   
+    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=12)
+    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=12)
     
     return ax
+
+
+def heatingrates_from_fluxes(pressure, downward_flux, upward_flux):
+    """taken from: https://github.com/atmtools/konrad/blob/main/konrad/radiation/radiation.py
+    Calculate heating rates from radiative fluxes.
+    Parameters:
+        pressure (ndarray): Pressure half-levels [Pa].
+        downward_flux (ndarray): Downward radiative flux [W/m^2].
+        upward_flux (ndarray): Upward radiative flux [W/m^2].
+    Returns:
+        ndarray: Radiative heating rate [K/day].
+    """
+    from typhon import constants
+    
+    c_p = constants.isobaric_mass_heat_capacity
+    g = constants.earth_standard_gravity
+
+    q = g / c_p * np.diff(upward_flux - downward_flux) / np.diff(pressure)
+    q *= 3600 * 24
+
+    return q
 
 os.chdir('/Users/froemer/Documents/wv_continuum/rfmip')
 
 exp_setup = read_exp_setup(exp_name='olr', 
                            path='experiment_setups/')
-spectral_grid = np.linspace(
+wavenumber = np.linspace(
     exp_setup.spectral_grid["min"],
     exp_setup.spectral_grid["max"],
     exp_setup.spectral_grid["n"],
@@ -79,53 +112,44 @@ weight = atm.profile_weight
 iwv = typhon.physics.integrate_water_vapor(
     atm.water_vapor[0, :, ::-1], atm.pres_layer[:, ::-1], axis=1)
 
-# dimensions: site, wavelength, pressure, 1, 1, down-/upward
-# OLR: [:,:, -1, 0, 0, 1]
-# surface downwelling: [:, :, 0, 0, 0, 0]
-data = np.zeros((4, 100, 1000))
+spectral_irradiance = np.zeros((4, 100, 1000, 60, 2))
 for i, cont in enumerate(['True', 'self', 'foreign', 'False']):
-    data[i] = data_on = np.array(pyarts.xml.load(
+    spectral_irradiance[i] = xr.DataArray(pyarts.xml.load(
     f"{exp_setup.rfmip_path}output/{exp_setup.name}/"
-    f"continua_{cont}/spectral_irradiance.xml"))[:,:, -1, 0, 0, 1]  
- 
-wavenumber, irradiance_on = convert_units(
-    exp_setup=exp_setup, spectral_grid=spectral_grid, irradiance=data[0])
-wavenumber, irradiance_self = convert_units(
-    exp_setup=exp_setup, spectral_grid=spectral_grid, irradiance=data[1])
-wavenumber, irradiance_foreign = convert_units(
-    exp_setup=exp_setup, spectral_grid=spectral_grid, irradiance=data[2])
-wavenumber, irradiance_off= convert_units(
-    exp_setup=exp_setup, spectral_grid=spectral_grid, irradiance=data[3])
+    f"continua_{cont}/spectral_irradiance.xml"))[:,:, :, 0, 0, :]  
 
-olr_on = scipy.integrate.trapz(irradiance_on, wavenumber)
-olr_self = scipy.integrate.trapz(irradiance_self, wavenumber)
-olr_foreign = scipy.integrate.trapz(irradiance_foreign, wavenumber)
-olr_off = scipy.integrate.trapz(irradiance_off, wavenumber)
+# dimensions: continuum config, site, wavelength, pressure, down-/upward
+_, spectral_irradiance = convert_units(
+    exp_setup=exp_setup, spectral_grid=wavenumber, irradiance=spectral_irradiance)
+
+# dimensions: continuum config, site, pressure, down-/upward
+irradiance = np.trapz(y=spectral_irradiance, x=wavenumber, axis=2)
+
+toa_up_spectral = spectral_irradiance[:, :, :, -1, 1]
+sfc_down_spectral = spectral_irradiance[:, :, :, 0, 0]
+ 
+olr = irradiance[:, :, -1, 1]
+sdw = irradiance[:, :, 0, 0]
+
+heating_rates = heatingrates_from_fluxes(atm.pres_layer, 
+                                         -irradiance[:, :, ::-1, 0],
+                                         irradiance[:, :, ::-1, 1])
 
 # %%
-strange = olr_on > olr_off
+strange = olr[0] > olr[3]
 inversion = atm.temp_layer[0, :, 36:].max(axis=1) > atm.surface_temperature[0]
 select = abs(atm.lat) <= 90
-# select = (atm.surface_temperature[0] > 284) & \
-#     (atm.surface_temperature[0] < 302) \
-#         & ~inversion
-# select = ~inversion
 
-olr_on_avg = np.average(olr_on[select], weights=weight[select])
-olr_self_avg = np.average(olr_self[select], weights=weight[select])
-olr_foreign_avg = np.average(olr_foreign[select], weights=weight[select])
-olr_off_avg = np.average(olr_off[select], weights=weight[select])
-
-print(f'effect total continuum: {olr_on_avg-olr_off_avg} W m-2')
-print(f'effect self continuum: {olr_self_avg-olr_off_avg} W m-2')
-print(f'effect foreign continuum: {olr_foreign_avg-olr_off_avg} W m-2')
+olr_avg = np.average(olr[:, select], axis=1, weights=weight[select])
+print(f'effect total continuum: {np.round(olr_avg[0]-olr_avg[3], 1)} W m-2')
+print(f'effect self continuum: {np.round(olr_avg[1]-olr_avg[3], 1)} W m-2')
+print(f'effect foreign continuum: {np.round(olr_avg[2]-olr_avg[3], 1)} W m-2')
 
 # %%
 select = abs(atm.lat) <= 90
 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
 ax = spectral_plot(ax)
-ax.set_title('change in OLR caused by WV continuum',
-             fontsize=16)
+ax.set_title('change in OLR caused by WV continuum', fontsize=16)
 
 colors = plt.get_cmap('coolwarm')
 quantity = atm.surface_temperature[0]
@@ -136,11 +160,11 @@ colorlist = colors((quantity - quantity.min())/
 for i in range(len(colorlist)):
     if select[i]:
         ax.plot(wavenumber,
-                mov_avg(irradiance_on[i].T - irradiance_off[i].T, 20)*1e3,
+                mov_avg(toa_up_spectral[0][i].T - toa_up_spectral[3][i].T, 20)*1e3,
                 color=colorlist[i])
 ax.plot(wavenumber,
         np.average(
-            mov_avg(irradiance_on[select].T - irradiance_off[select].T, 20)*1e3, 
+            mov_avg(toa_up_spectral[0][select].T - toa_up_spectral[3][select].T, 20)*1e3, 
             axis=1, weights=weight[select]), color='k', linewidth=3)
 # cbar = plt.colorbar(colors)
 # ax.set_ylim([-15,5])
@@ -151,126 +175,183 @@ ax.set_title('global mean change in OLR caused by WV continuum',
              fontsize=16)
 ax.plot(wavenumber, 
         mov_avg(
-            np.average(irradiance_on - irradiance_off, axis=0, weights=weight),
+            np.average(toa_up_spectral[0] - toa_up_spectral[3], axis=0, weights=weight),
             20)*1e3, 
         label='total')
 ax.plot(wavenumber, 
         mov_avg(
-            np.average(irradiance_self - irradiance_off, axis=0, weights=weight),
+            np.average(toa_up_spectral[1] - toa_up_spectral[3], axis=0, weights=weight),
             20)*1e3, 
         label='self')
 ax.plot(wavenumber, 
         mov_avg(
-            np.average(irradiance_foreign - irradiance_off, axis=0, weights=weight),
+            np.average(toa_up_spectral[2] - toa_up_spectral[3], axis=0, weights=weight),
             20)*1e3, 
         label='foreign')
 ax.legend(fontsize=14)
-# %%
-# fig, ax = plt.subplots(1, 1, figsize=(3, 5))
-
-# ax.set_title('temperature', fontsize=18)
-# ax.plot(atm.temp_layer[0, :].T,
-#         atm.pres_layer[:].T/1e2, 
-#         color='grey',
-#         alpha=0.5, linewidth=0.5)
-# ax.plot(atm.temp_layer[0, strange].T,
-#         atm.pres_layer[strange].T/1e2, 
-#         color='green', alpha=0.5, linewidth=0.5)
-# ax.scatter(atm.surface_temperature[0], 
-#            atm.pres_layer[:, -1].T/1e2,
-#            s=10, color='grey')
-# ax.scatter(atm.surface_temperature[0, strange], 
-#            atm.pres_layer[strange, -1].T/1e2,
-#            s=10, color='green')
-
-# ax.set_ylim([atm.pres_layer.max()/1e2, 
-#              atm.pres_layer.min()/1e2])
-
 
 # %%
 # contingency table
-inversions_strange = len(np.where(strange[inversion])[0])
-inversions_normal = len(np.where(~strange[inversion])[0])
-not_inversions_strange = len(np.where(strange[~inversion])[0])
-not_inversions_normal = len(np.where(~strange[~inversion])[0])
+# inversions_strange = len(np.where(strange[inversion])[0])
+# inversions_normal = len(np.where(~strange[inversion])[0])
+# not_inversions_strange = len(np.where(strange[~inversion])[0])
+# not_inversions_normal = len(np.where(~strange[~inversion])[0])
 
-n = inversions_normal + inversions_strange \
-    + not_inversions_normal + not_inversions_strange
+# n = inversions_normal + inversions_strange \
+#     + not_inversions_normal + not_inversions_strange
     
-hit_rate = inversions_strange / (inversions_strange + not_inversions_strange)
-false_alarm_rate = inversions_normal / (inversions_normal + not_inversions_normal)
-peirce_skill_score = hit_rate - false_alarm_rate
+# hit_rate = inversions_strange / (inversions_strange + not_inversions_strange)
+# false_alarm_rate = inversions_normal / (inversions_normal + not_inversions_normal)
+# peirce_skill_score = hit_rate - false_alarm_rate
 
-print(np.round(peirce_skill_score, 2))
-# %%
-# fig, ax = plt.subplots(1, 2, figsize=(7, 7))
-# ax[0].set_title('temperature', fontsize=16)
-# ax[0].plot(atm.temp_layer[0, 20, :],
-#          atm.pres_layer[20, :]/100)
-# ax[0].set_ylim(1000, 100)
-# ax[0].scatter(atm.surface_temperature[0, 20], atm.pres_layer[20, -1]/100)
-
-# ax[1].set_title('H2O VMR', fontsize=16)
-# ax[1].plot(atm.water_vapor[0, 20, :],
-#          atm.pres_layer[20, :]/100)
-# ax[1].set_ylim(1000, 100)
+# print(np.round(peirce_skill_score, 2))
 
 # %% reproduce Paynter & Ramaswamy (2012)
-# select = ~inversion
-select = atm.surface_temperature[0] > 0
-print(f"{len(atm.lat[select])}/100 sites selected")
 
-fig, ax = plt.subplots(2, 2, figsize=(20, 13))
-colors = plt.get_cmap('inferno')
-quantity = atm.surface_temperature[0]
-colorlist = colors(((quantity - 284)/(302 - 284)))
+dict = {'OLR': olr,
+        'SDW': sdw}
 
-ax[0, 0], ax[0, 1], ax[1, 0], ax[1, 1] = iwv_plot(ax[0, 0]),\
-    iwv_plot(ax[0, 1]), iwv_plot(ax[1, 0]), iwv_plot(ax[1, 1])
+for var in dict.keys():
+    # select = ~inversion
+    select = atm.surface_temperature[0] > 0
+    print(f"{len(atm.lat[select])}/100 sites selected")
 
-ax[0, 0].set_ylim([olr_off[select].min(), olr_off[select].max()])
+    fig, ax = plt.subplots(2, 2, figsize=(20, 13))
+    colormap = plt.get_cmap('inferno')
+    color = atm.surface_temperature[0]
 
-ax[0, 0].set_title('OLR with no Continuum', fontsize=18)
-ax[0, 0].scatter(iwv[select], olr_off[select], 
-                 color=np.array(colorlist)[select])
-ax[0, 1].set_title('Reduction in OLR due to Continuum', fontsize=18)
-ax[0, 1].scatter(iwv[select], -(olr_on - olr_off)[select], 
-                 color=np.array(colorlist)[select])
-ax[1, 0].set_title('Reduction in OLR due to Self Continuum', fontsize=18)
-ax[1, 0].scatter(iwv[select], -(olr_self - olr_off)[select], 
-                 color=np.array(colorlist)[select])
-ax[1, 1].set_title('Reduction in OLR due to Foreign Continuum', fontsize=18)
-ax[1, 1].scatter(iwv[select], -(olr_foreign - olr_off)[select], 
-                 color=np.array(colorlist)[select])
+    ax[0, 0].set_ylim([dict[var][3][select].min(), dict[var][3][select].max()])
+
+    ax[0, 0].set_title(f'{var} with no Continuum', fontsize=18)
+    a = ax[0, 0].scatter(iwv[select], dict[var][3][select], 
+                    c=np.array(color)[select], s=200,
+                    vmin=284, vmax=302, cmap=colormap)
+    ax[0, 1].set_title(f'Reduction in {var} due to Continuum', fontsize=18)
+    a = ax[0, 1].scatter(iwv[select], -(dict[var][0] - dict[var][3])[select], 
+                    c=np.array(color)[select], s=200,
+                    vmin=284, vmax=302, cmap=colormap)
+    ax[1, 0].set_title(f'Reduction in {var} due to Self Continuum', fontsize=18)
+    a = ax[1, 0].scatter(iwv[select], -(dict[var][1] - dict[var][3])[select], 
+                    c=np.array(color)[select], s=200,
+                    vmin=284, vmax=302, cmap=colormap)
+    ax[1, 1].set_title(f'Reduction in {var} due to Foreign Continuum', fontsize=18)
+    a = ax[1, 1].scatter(iwv[select], -(dict[var][2] - dict[var][3])[select], 
+                    c=np.array(color)[select], s=200,
+                    vmin=284, vmax=302, cmap=colormap)
+
+    ax[0, 0], ax[0, 1], ax[1, 0], ax[1, 1] = iwv_plot(ax[0, 0]),\
+        iwv_plot(ax[0, 1]), iwv_plot(ax[1, 0]), iwv_plot(ax[1, 1])
+
+
+    plt.subplots_adjust(bottom=0.1, right=0.9, top=0.9)
+    # [left, bottom, width, height]
+    cax = plt.axes([0.92, 0.2, 0.03, 0.6])
+    cb = plt.colorbar(a, cax=cax)
+    cb.set_ticks(np.arange(284, 303, 2, dtype='int'),
+                                fontsize=15)
+    cb.set_ticklabels(cb.get_ticks(), fontsize=15)
+    cb.set_label('surface temperature / K', fontsize=18)
+
+    fig.savefig(f'/Users/froemer/Documents/wv_continuum/rfmip/plots/continuum_change_{var}.png',
+                dpi=300)
 
 # %%
 select = abs(atm.lat) <= 90
-# select = ~inversion
-fig, ax = plt.subplots(1, 2, figsize=(18, 6))
-ax[0] = spectral_plot(ax[0])
-ax[0].set_title('change in OLR caused by self continuum',
-             fontsize=16)
-ax[0].set_title('change in OLR caused by foreign continuum',
-             fontsize=16)
 
-# colors = plt.get_cmap('gist_rainbow_r')
-colors = plt.cm.get_cmap('gist_rainbow_r')
-# quantity = atm.surface_temperature[0]
+fig, ax = plt.subplots(2, 2, figsize=(18, 12))
+
+ax[0, 0].set_title('change in OLR caused by self continuum', fontsize=16)
+ax[0, 1].set_title('change in OLR caused by foreign continuum', fontsize=16)
+ax[1, 0].set_title('change in SDW caused by self continuum', fontsize=16)
+ax[1, 1].set_title('change in SDW caused by foreign continuum', fontsize=16)
+
+# ax[0, 0].set_yticks(np.arange(0, 50, 5, dtype='int'))
+# ax[0, 0].set_yticklabels(ax[0, 0].get_yticks(), fontsize=14)
+# ax[0, 1].set_yticks(np.arange(0, 14, 2, dtype='int'))
+# ax[0, 1].set_yticklabels(ax[0, 1].get_yticks(), fontsize=14)
+
+# cmap = 'jet'
+cmap = 'density'
+colors = plt.cm.get_cmap(cmap)
 quantity = iwv
-
-liste = quantity
-colorlist = colors((quantity - quantity.min())/
-                   (quantity.max() - quantity.min())+0.1)
 
 for i in range(len(colorlist)):
     if select[i]:
-        a = ax[0].scatter(wavenumber,
-                -mov_avg(irradiance_self[i].T - irradiance_off[i].T, 20)*1e3,
-                c=np.tile(quantity[i], len(wavenumber)), vmin=0, vmax=60, s=1, cmap=colors)
-        a = ax[1].scatter(wavenumber,
-                -mov_avg(irradiance_foreign[i].T - irradiance_off[i].T, 20)*1e3,
-                c=np.tile(quantity[i], len(wavenumber)), vmin=0, vmax=60, s=1, cmap=colors)
+        ax[0, 0].scatter(wavenumber,
+                -mov_avg(toa_up_spectral[1][i].T - toa_up_spectral[3][i].T, 20)*1e3,
+                c=np.tile(quantity[i], len(wavenumber)),
+                vmin=-10, vmax=60, s=1, cmap=colors)
+        ax[0, 1].scatter(wavenumber,
+                -mov_avg(toa_up_spectral[2][i].T - toa_up_spectral[3][i].T, 20)*1e3,
+                c=np.tile(quantity[i], len(wavenumber)),
+                vmin=-10, vmax=60, s=1, cmap=colors)
+        ax[1, 0].scatter(wavenumber,
+                -mov_avg(sfc_down_spectral[1][i].T - sfc_down_spectral[3][i].T, 20)*1e3,
+                c=np.tile(quantity[i], len(wavenumber)),
+                vmin=-10, vmax=60, s=1, cmap=colors)
+        a = ax[1, 1].scatter(wavenumber,
+                -mov_avg(sfc_down_spectral[2][i].T - sfc_down_spectral[3][i].T, 20)*1e3,
+                c=np.tile(quantity[i], len(wavenumber)),
+                vmin=-10, vmax=60, s=1, cmap=colors)
 
-plt.colorbar(a)
+ax[0, 0], ax[0, 1] = spectral_plot(ax[0, 0]), spectral_plot(ax[0, 1])
+ax[1, 0], ax[1, 1] = spectral_plot(ax[1, 0]), spectral_plot(ax[1, 1])
 
+
+plt.subplots_adjust(bottom=0.1, right=0.9, top=0.9)
+cax = plt.axes([0.92, 0.1, 0.02, 0.8]) # [left, bottom, width, height]
+cb = plt.colorbar(a, cax=cax)
+cb.set_ticks(np.arange(0, 51, 10, dtype='int'),
+                            fontsize=10)
+cb.set_ticklabels(cb.get_ticks(), fontsize=15)
+cb.set_label('WVC / kg m-2', fontsize=18)
+
+fig.savefig(f'/Users/froemer/Documents/wv_continuum/rfmip/plots/continuum_spectral_change_{cmap}.png',
+            dpi=300)
+# %%
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+ax.plot(np.average(irradiance[0, :, :, 1], axis=0, weights=weight),
+        np.average(atm.pres_layer, axis=0, weights=weight)[::-1],
+        label='upwelling')
+ax.plot(-np.average(irradiance[0, :, :, 0], axis=0, weights=weight),
+        np.average(atm.pres_layer, axis=0, weights=weight)[::-1],
+        label='downwelling')
+
+ax.invert_yaxis()
+ax.legend(fontsize=15)
+
+# %%
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+ax.plot(np.average(heating_rates[0], axis=0, weights=weight),
+        np.average(atm.pres_level, axis=0, weights=weight)[1:-1],
+        label='heating rate')
+
+ax.invert_yaxis()
+ax.legend(fontsize=15)
+# ax.set_xlim([-1, 1])
+# ax.set_yscale('log')
+# %%
+fig, ax = plt.subplots(2, 2, figsize=(15, 15))
+
+ax[0, 0].set_ylim([1000, 10])
+ax[0, 1].set_ylim([1000, 10])
+ax[1, 0].set_ylim([1000, 10])
+ax[1, 1].set_ylim([1000, 10])
+
+for i in range(atm.pres_level[:, 2:-2].shape[1]):
+    a = ax[0, 0].scatter(atm.lat, atm.pres_level[:, i]/100, 
+                     c=heating_rates[0, :, i],
+                     s=50, cmap='RdYlBu', vmin=-3, vmax=0)  
+    b = ax[0, 1].scatter(atm.lat, atm.pres_level[:, i]/100, 
+                     c=(heating_rates[0, :, i]-heating_rates[3, :, i]),
+                     s=50, cmap='RdYlBu', vmin=-1.2, vmax=0)
+    c = ax[1, 0].scatter(atm.lat, atm.pres_level[:, i]/100, 
+                     c=(heating_rates[1, :, i]-heating_rates[3, :, i]),
+                     s=50, cmap='RdYlBu', vmin=-1.2, vmax=0)
+    d = ax[1, 1].scatter(atm.lat, atm.pres_level[:, i]/100, 
+                     c=(heating_rates[2, :, i]-heating_rates[3, :, i]),
+                     s=50, cmap='RdYlBu', vmin=-0.1, vmax=0.1)
+
+
+    
 # %%
