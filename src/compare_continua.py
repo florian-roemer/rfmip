@@ -43,14 +43,14 @@ def spectral_plot(ax):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    ax.set_ylabel(r"spectral irradiance / mW$\,$m$^{-2}\,$cm", fontsize=14)
-    ax.set_xlabel("wavenumber / cm-1", fontsize=14)
+    ax.set_ylabel(r"spectral irradiance / mW$\,$m$^{-2}\,$cm", fontsize=18)
+    ax.set_xlabel("wavenumber / cm-1", fontsize=18)
     
     ax.set_xticks(np.array(ax.get_xticks(), dtype='int'))
     ax.set_yticks(np.array(ax.get_yticks(), dtype='int'))
    
-    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=12)
-    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=12)
+    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=16)
+    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=16)
     
     return ax
 
@@ -62,14 +62,14 @@ def iwv_plot(ax):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    ax.set_ylabel(r"Flux / W$\,$m$^{-2}$", fontsize=14)
-    ax.set_xlabel(r"WVC / kg$\,$m$^{-2}$", fontsize=14)
+    ax.set_ylabel(r"Flux / W$\,$m$^{-2}$", fontsize=18)
+    ax.set_xlabel(r"WVC / kg$\,$m$^{-2}$", fontsize=18)
 
     ax.set_xticks(np.array(ax.get_xticks(), dtype='int'))
     ax.set_yticks(np.array(ax.get_yticks(), dtype='int'))
    
-    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=12)
-    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=12)
+    ax.set_xticklabels(np.array(ax.get_xticks(), dtype='int'), fontsize=16)
+    ax.set_yticklabels(np.array(ax.get_yticks(), dtype='int'), fontsize=16)
     
     return ax
 
@@ -129,7 +129,7 @@ toa_up_spectral = spectral_irradiance[:, :, :, -1, 1]
 sfc_down_spectral = spectral_irradiance[:, :, :, 0, 0]
  
 olr = irradiance[:, :, -1, 1]
-sdw = irradiance[:, :, 0, 0]
+sdr = irradiance[:, :, 0, 0]
 
 heating_rates = heatingrates_from_fluxes(atm.pres_layer, 
                                          -irradiance[:, :, ::-1, 0],
@@ -141,15 +141,23 @@ inversion = atm.temp_layer[0, :, 36:].max(axis=1) > atm.surface_temperature[0]
 select = abs(atm.lat) <= 90
 
 olr_avg = np.average(olr[:, select], axis=1, weights=weight[select])
+print('OLR:')
 print(f'effect total continuum: {np.round(olr_avg[0]-olr_avg[3], 1)} W m-2')
 print(f'effect self continuum: {np.round(olr_avg[1]-olr_avg[3], 1)} W m-2')
 print(f'effect foreign continuum: {np.round(olr_avg[2]-olr_avg[3], 1)} W m-2')
+
+sdr_avg = np.average(sdr[:, select], axis=1, weights=weight[select])
+print('SDR:')
+print(f'effect total continuum: {np.round(sdr_avg[0]-sdr_avg[3], 1)} W m-2')
+print(f'effect self continuum: {np.round(sdr_avg[1]-sdr_avg[3], 1)} W m-2')
+print(f'effect foreign continuum: {np.round(sdr_avg[2]-sdr_avg[3], 1)} W m-2')
+
 
 # %%
 select = abs(atm.lat) <= 90
 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
 ax = spectral_plot(ax)
-ax.set_title('change in OLR caused by WV continuum', fontsize=16)
+ax.set_title('change in OLR caused by WV continuum', fontsize=20)
 
 colors = plt.get_cmap('coolwarm')
 quantity = atm.surface_temperature[0]
@@ -172,7 +180,7 @@ ax.plot(wavenumber,
 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
 ax = spectral_plot(ax)
 ax.set_title('global mean change in OLR caused by WV continuum',
-             fontsize=16)
+             fontsize=20)
 ax.plot(wavenumber, 
         mov_avg(
             np.average(toa_up_spectral[0] - toa_up_spectral[3], axis=0, weights=weight),
@@ -188,7 +196,7 @@ ax.plot(wavenumber,
             np.average(toa_up_spectral[2] - toa_up_spectral[3], axis=0, weights=weight),
             20)*1e3, 
         label='foreign')
-ax.legend(fontsize=14)
+ax.legend(fontsize=18)
 
 # %%
 # contingency table
@@ -209,7 +217,7 @@ ax.legend(fontsize=14)
 # %% reproduce Paynter & Ramaswamy (2012)
 
 dict = {'OLR': olr,
-        'SDW': sdw}
+        'SDR': sdr}
 
 for var in dict.keys():
     # select = ~inversion
@@ -222,19 +230,19 @@ for var in dict.keys():
 
     ax[0, 0].set_ylim([dict[var][3][select].min(), dict[var][3][select].max()])
 
-    ax[0, 0].set_title(f'{var} with no Continuum', fontsize=18)
+    ax[0, 0].set_title(f'{var} with no Continuum', fontsize=20)
     a = ax[0, 0].scatter(iwv[select], dict[var][3][select], 
                     c=np.array(color)[select], s=200,
                     vmin=284, vmax=302, cmap=colormap)
-    ax[0, 1].set_title(f'Reduction in {var} due to Continuum', fontsize=18)
+    ax[0, 1].set_title(f'Reduction in {var} due to Continuum', fontsize=20)
     a = ax[0, 1].scatter(iwv[select], -(dict[var][0] - dict[var][3])[select], 
                     c=np.array(color)[select], s=200,
                     vmin=284, vmax=302, cmap=colormap)
-    ax[1, 0].set_title(f'Reduction in {var} due to Self Continuum', fontsize=18)
+    ax[1, 0].set_title(f'Reduction in {var} due to Self Continuum', fontsize=20)
     a = ax[1, 0].scatter(iwv[select], -(dict[var][1] - dict[var][3])[select], 
                     c=np.array(color)[select], s=200,
                     vmin=284, vmax=302, cmap=colormap)
-    ax[1, 1].set_title(f'Reduction in {var} due to Foreign Continuum', fontsize=18)
+    ax[1, 1].set_title(f'Reduction in {var} due to Foreign Continuum', fontsize=20)
     a = ax[1, 1].scatter(iwv[select], -(dict[var][2] - dict[var][3])[select], 
                     c=np.array(color)[select], s=200,
                     vmin=284, vmax=302, cmap=colormap)
@@ -247,9 +255,8 @@ for var in dict.keys():
     # [left, bottom, width, height]
     cax = plt.axes([0.92, 0.2, 0.03, 0.6])
     cb = plt.colorbar(a, cax=cax)
-    cb.set_ticks(np.arange(284, 303, 2, dtype='int'),
-                                fontsize=15)
-    cb.set_ticklabels(cb.get_ticks(), fontsize=15)
+    cb.set_ticks(np.arange(284, 303, 2, dtype='int'))
+    cb.set_ticklabels(cb.get_ticks(), fontsize=16)
     cb.set_label('surface temperature / K', fontsize=18)
 
     fig.savefig(f'/Users/froemer/Documents/wv_continuum/rfmip/plots/continuum_change_{var}.png',
@@ -260,10 +267,10 @@ select = abs(atm.lat) <= 90
 
 fig, ax = plt.subplots(2, 2, figsize=(18, 12))
 
-ax[0, 0].set_title('change in OLR caused by self continuum', fontsize=16)
-ax[0, 1].set_title('change in OLR caused by foreign continuum', fontsize=16)
-ax[1, 0].set_title('change in SDW caused by self continuum', fontsize=16)
-ax[1, 1].set_title('change in SDW caused by foreign continuum', fontsize=16)
+ax[0, 0].set_title('change in OLR caused by self continuum', fontsize=20)
+ax[0, 1].set_title('change in OLR caused by foreign continuum', fontsize=20)
+ax[1, 0].set_title('change in SDR caused by self continuum', fontsize=20)
+ax[1, 1].set_title('change in SDR caused by foreign continuum', fontsize=20)
 
 # ax[0, 0].set_yticks(np.arange(0, 50, 5, dtype='int'))
 # ax[0, 0].set_yticklabels(ax[0, 0].get_yticks(), fontsize=14)
@@ -301,9 +308,8 @@ ax[1, 0], ax[1, 1] = spectral_plot(ax[1, 0]), spectral_plot(ax[1, 1])
 plt.subplots_adjust(bottom=0.1, right=0.9, top=0.9)
 cax = plt.axes([0.92, 0.1, 0.02, 0.8]) # [left, bottom, width, height]
 cb = plt.colorbar(a, cax=cax)
-cb.set_ticks(np.arange(0, 51, 10, dtype='int'),
-                            fontsize=10)
-cb.set_ticklabels(cb.get_ticks(), fontsize=15)
+cb.set_ticks(np.arange(0, 51, 10, dtype='int'),)
+cb.set_ticklabels(cb.get_ticks(), fontsize=16)
 cb.set_label('WVC / kg m-2', fontsize=18)
 
 fig.savefig(f'/Users/froemer/Documents/wv_continuum/rfmip/plots/continuum_spectral_change_{cmap}.png',
@@ -318,7 +324,7 @@ ax.plot(-np.average(irradiance[0, :, :, 0], axis=0, weights=weight),
         label='downwelling')
 
 ax.invert_yaxis()
-ax.legend(fontsize=15)
+ax.legend(fontsize=18)
 
 # %%
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -327,7 +333,7 @@ ax.plot(np.average(heating_rates[0], axis=0, weights=weight),
         label='heating rate')
 
 ax.invert_yaxis()
-ax.legend(fontsize=15)
+ax.legend(fontsize=18)
 # ax.set_xlim([-1, 1])
 # ax.set_yscale('log')
 # %%
