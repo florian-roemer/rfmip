@@ -228,10 +228,10 @@ for var in dict.keys():
     colormap = plt.get_cmap('inferno')
     color = atm.surface_temperature[0]
 
-    ax[0, 0].set_ylim([dict[var][3][select].min(), dict[var][3][select].max()])
+    ax[0, 0].set_ylim([abs(dict[var][3][select]).min(), abs(dict[var][3][select]).max()])
 
     ax[0, 0].set_title(f'{var} with no Continuum', fontsize=20)
-    a = ax[0, 0].scatter(iwv[select], dict[var][3][select], 
+    a = ax[0, 0].scatter(iwv[select], abs(dict[var][3][select]), 
                     c=np.array(color)[select], s=200,
                     vmin=284, vmax=302, cmap=colormap)
     ax[0, 1].set_title(f'Reduction in {var} due to Continuum', fontsize=20)
