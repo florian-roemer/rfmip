@@ -12,7 +12,7 @@ def run_arts_batch(exp_setup, verbosity=3, continua=True):
 
     ws = pyarts.workspace.Workspace(verbosity=verbosity)
     
-    ws.LegacyContinuaInit()
+    # ws.LegacyContinuaInit()
     ws.PlanetSet(option="Earth")
 
     ws.IndexCreate('planck_emission')
@@ -64,13 +64,13 @@ def run_arts_batch(exp_setup, verbosity=3, continua=True):
     # species = pyarts.xml.load(f"{exp_setup.rfmip_path}{exp_setup.input_folder}species.xml")
     # add_species(ws, species, continua=continua)
     if continua == True:
-        species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320",
+        species = ["H2O, H2O-SelfContCKDMT350, H2O-ForeignContCKDMT350",
                     "O3", "CO2, CO2-CKDMT252", "N2O"]
     elif continua == "self":
-        species = ["H2O, H2O-SelfContCKDMT320",
+        species = ["H2O", "H2O-SelfContCKDMT350",
                     "O3", "CO2, CO2-CKDMT252", "N2O"]
     elif continua == "foreign":
-        species = ["H2O, H2O-ForeignContCKDMT320",
+        species = ["H2O, H2O-ForeignContCKDMT350",
                     "O3", "CO2, CO2-CKDMT252", "N2O"]
     elif continua == False:
         species = ["H2O",
@@ -295,7 +295,7 @@ def add_species(ws, species, continua=True):
 
 
 def main():
-    exp = read_exp_setup(exp_name='test', path='/Users/jpetersen/rare/rfmip/experiment_setups/')
+    exp = read_exp_setup(exp_name='olr', path='/Users/froemer/Documents/wv_continuum/rfmip/experiment_setups/')
     print(exp)
     run_arts_batch(exp, continua=True)
 

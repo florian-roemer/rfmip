@@ -50,7 +50,7 @@ class BatchLookUpTable():
 
 
     def lut_setup(self, continua):
-        self.ws.LegacyContinuaInit()
+        # self.ws.LegacyContinuaInit()
         self.ws.PlanetSet(option="Earth")        
 
         self.f_grid_from_spectral_grid()
@@ -60,11 +60,11 @@ class BatchLookUpTable():
         # species = pyarts.xml.load(f"{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}species.xml")
         # self.add_species(species=species, continua=continua)
         if continua == True:
-            species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320", "O3", "CO2"]
+            species = ["H2O, H2O-SelfContCKDMT350, H2O-ForeignContCKDMT350", "O3", "CO2"]
         elif continua == "self":
-            species = ["H2O, H2O-SelfContCKDMT320",  "O3", "CO2"]
+            species = ["H2O, H2O-SelfContCKDMT350",  "O3", "CO2"]
         elif continua == "foreign":
-            species = ["H2O, H2O-ForeignContCKDMT320", "O3", "CO2"]
+            species = ["H2O, H2O-ForeignContCKDMT350", "O3", "CO2"]
         elif continua == False:
             species = ["H2O", "O3", "CO2"]
 
@@ -210,6 +210,8 @@ if __name__ == '__main__':
     config = vars(parser.parse_args())
     print(config)
     
+    # config = {'experiment_setups': ['olr'], 'chunks': [8, 0], 'combine_luts': False}
+    
     if config['combine_luts']:
         for exp_name in config['experiment_setups']:
             exp = exp_name
@@ -224,7 +226,7 @@ if __name__ == '__main__':
         if exp_name is not None:
             exp_setup_path = f'{os.getcwd()}/experiment_setups/'
             exp = read_exp_setup(exp_name=str(exp_name), path=exp_setup_path)
-            if not os.path.exists(f'{exp_name.rfmip_path}{exp_name.input_folder}'):
+            if not os.path.exists(f'{exp.rfmip_path}{exp.input_folder}'):
                 input_data.create_input_data(exp)
         main(exp=exp, n_chunks=config['chunks'][0], chunks_id=config['chunks'][1],
              continua='self')
