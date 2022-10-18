@@ -60,17 +60,13 @@ class BatchLookUpTable():
         # species = pyarts.xml.load(f"{self.exp_setup.rfmip_path}{self.exp_setup.input_folder}species.xml")
         # self.add_species(species=species, continua=continua)
         if continua == True:
-            species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320",
-                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+            species = ["H2O, H2O-SelfContCKDMT320, H2O-ForeignContCKDMT320", "O3", "CO2"]
         elif continua == "self":
-            species = ["H2O, H2O-SelfContCKDMT320",
-                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+            species = ["H2O, H2O-SelfContCKDMT320",  "O3", "CO2"]
         elif continua == "foreign":
-            species = ["H2O, H2O-ForeignContCKDMT320",
-                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+            species = ["H2O, H2O-ForeignContCKDMT320", "O3", "CO2"]
         elif continua == False:
-            species = ["H2O",
-                        "O3", "CO2, CO2-CKDMT252", "N2O"]
+            species = ["H2O", "O3", "CO2"]
 
         self.ws.abs_speciesSet(species=species)
 
@@ -186,17 +182,17 @@ def combine_luts(exp_setup, n_chunks=8):
 def main(exp=None, n_chunks=0, chunks_id=None, continua=True):
     if exp is None:
         exp = ExperimentSetup(
-            name='lut',
-            description='testing lookup table',
-            rfmip_path='/Users/jpetersen/rare/rfmip/',
+            name='olr',
+            description='outgoing longwave radiation',
+            rfmip_path='/Users/froemer/Documents/wv_continuum/rfmip/',
             input_folder='input/rfmip/',
-            arts_data_path='/Users/jpetersen/rare/',
-            lookuptable='lut_test.xml',
+            arts_data_path='/Users/froemer/Documents/',
+            lookuptable='olr.xml',
             solar_type='None',
-            planck_emission='0',
-            which_spectral_grid='wavelength',
-            spectral_grid={'min': 380, 'max': 780, 'n': 10},
-            species=['water_vapor'],
+            planck_emission='1',
+            which_spectral_grid='kayser',
+            spectral_grid={'min': 1, 'max': 2500, 'n': 1000},
+            species=['water_vapor', 'ozone', 'carbon_dioxide_GM'],
             angular_grid={'N_za_grid': 20, 'N_aa_grid': 41, 'za_grid_type': 'linear_mu'}
         )
     
