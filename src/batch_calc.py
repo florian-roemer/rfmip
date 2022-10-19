@@ -12,7 +12,6 @@ def run_arts_batch(exp_setup, verbosity=3):
 
     ws = pyarts.workspace.Workspace(verbosity=verbosity)
     
-    ws.LegacyContinuaInit()
     ws.PlanetSet(option="Earth")
 
     ws.IndexCreate('planck_emission')
@@ -255,8 +254,6 @@ def gas_scattering_agenda__Rayleigh(ws):
 
 
 def add_species(ws, species):
-    if "abs_species-O3" in species:
-        species.append("abs_species-O3-XFIT")
     if 'abs_species-H2O' in species:
         species = replace_values(species, 'abs_species-H2O', 'abs_species-H2O, H2O-SelfContCKDMT350, H2O-ForeignContCKDMT350')
     if 'abs_species-CO2' in species:
@@ -275,7 +272,7 @@ def replace_values(list_to_replace, item_to_replace, item_to_replace_with):
 
 
 def main():
-    exp = read_exp_setup(exp_name='test', path='/Users/jpetersen/rare/rfmip/experiment_setups/')
+    exp = read_exp_setup(exp_name='olr', path='/Users/froemer/Documents/wv_continuum/rfmip/experiment_setups/')
     print(exp)
     run_arts_batch(exp)
 
